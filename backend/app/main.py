@@ -1,0 +1,33 @@
+from fastapi import FastAPI
+from sqlalchemy import text
+
+from backend.app.db.database import engine
+from fastapi import Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from backend.app.db.dependencies import get_db
+from backend.app.api.users import router as users_router
+
+app = FastAPI(title="Project Management Dashboard API")
+app.include_router(users_router)
+
+@app.get("/")
+def read_root():
+    return {"message": "API is running"}
+
+
+@app.get("/health/database")
+def database_health():
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+
+    return {"database": "connected"}
+
+@app.get("/health/database-session")
+def database_session_health(
+    db: Session = Depends(get_db),
+):
+    db.execute(text("SELECT 1"))
+
+    return {"database_session": "working"}
