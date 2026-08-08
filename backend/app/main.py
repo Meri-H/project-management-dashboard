@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.dependencies import get_db
 from backend.app.api.users import router as users_router
+from backend.app.core.exception_handlers import register_exception_handlers
 
 app = FastAPI(title="Project Management Dashboard API")
+register_exception_handlers(app)
 app.include_router(users_router)
 
 @app.get("/")
