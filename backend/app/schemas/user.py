@@ -18,3 +18,12 @@ class UserCreate(BaseModel):
     email: str
     full_name: str
     password: str
+
+class UserRegister(BaseModel):
+    login: str
+    password: str
+    repeat_password: str
+
+class UserLogin(BaseModel):
+    login: str
+    password: str

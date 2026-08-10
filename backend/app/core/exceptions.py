@@ -19,3 +19,39 @@ class InvalidCredentialsException(AppException):
             message="Invalid email or password",
             status_code=401,
         )
+
+class PasswordsDoNotMatchException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="Passwords do not match",
+            status_code=400,
+        )
+
+class ProjectNotFoundException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="Project not found or access denied",
+            status_code=404,
+        )
+
+class ProjectOwnerRequiredException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="Only the project owner can perform this action",
+            status_code=403,
+        )
+
+class UserNotFoundException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="User not found",
+            status_code=404,
+        )
+
+
+class UserAlreadyMemberException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="User already has access to this project",
+            status_code=409,
+        )
