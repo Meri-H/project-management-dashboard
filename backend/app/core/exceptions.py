@@ -55,3 +55,10 @@ class UserAlreadyMemberException(AppException):
             message="User already has access to this project",
             status_code=409,
         )
+
+class ProjectMemberNotFoundException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="Project participant not found",
+            status_code=404,
+        )

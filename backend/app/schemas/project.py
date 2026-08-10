@@ -18,6 +18,7 @@ class ProjectResponse(BaseModel):
     name: str
     description: str | None
     owner_id: int
+    owner_email: str
     created_at: datetime
     updated_at: datetime
 

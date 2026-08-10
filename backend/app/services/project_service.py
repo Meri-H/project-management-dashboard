@@ -1,11 +1,42 @@
-from backend.app.models import Project
-from backend.app.models.project_member import ProjectMember
 from sqlalchemy.orm import Session
-from backend.app.core.exceptions import ProjectNotFoundException, ProjectOwnerRequiredException, UserNotFoundException, UserAlreadyMemberException
-from backend.app.schemas.project import ProjectCreate, ProjectUpdate
-from backend.app.models.user import User
+
+from backend.app.models.project import Project
+from backend.app.models.project_member import ProjectMember
 from backend.app.models.document import Document
+from backend.app.models.user import User
+
+from backend.app.schemas.project import ProjectCreate, ProjectUpdate
+
+from backend.app.core.exceptions import (
+    ProjectNotFoundException,
+    ProjectOwnerRequiredException,
+    UserNotFoundException,
+    ProjectMemberNotFoundException,
+)
+
 from backend.app.services import storage_service
+
+
+def project_to_response_data(
+    db: Session,
+    project: Project,
+):
+    owner = (
+        db.query(User)
+        .filter(User.id == project.owner_id)
+        .first()
+    )
+
+    return {
+        "id": project.id,
+        "name": project.name,
+        "description": project.description,
+        "owner_id": project.owner_id,
+        "owner_email": owner.email,
+        "created_at": project.created_at,
+        "updated_at": project.updated_at,
+    }
+
 
 def create_project(
     db: Session,
@@ -22,7 +53,8 @@ def create_project(
     db.commit()
     db.refresh(project)
 
-    return project
+    return project_to_response_data(db, project)
+
 
 def get_accessible_projects(
     db: Session,
@@ -34,23 +66,23 @@ def get_accessible_projects(
         .all()
     )
 
-    member_project_ids = (
-        db.query(ProjectMember.project_id)
+    shared_projects = (
+        db.query(Project)
+        .join(
+            ProjectMember,
+            ProjectMember.project_id == Project.id,
+        )
         .filter(ProjectMember.user_id == user_id)
         .all()
     )
 
-    member_project_ids = [project_id for (project_id,) in member_project_ids]
+    projects = owned_projects + shared_projects
 
-    shared_projects = (
-        db.query(Project)
-        .filter(Project.id.in_(member_project_ids))
-        .all()
-        if member_project_ids
-        else []
-    )
+    return [
+        project_to_response_data(db, project)
+        for project in projects
+    ]
 
-    return owned_projects + shared_projects
 
 def get_project(
     db: Session,
@@ -66,48 +98,29 @@ def get_project(
     if not project:
         raise ProjectNotFoundException()
 
-    if project.owner_id == user_id:
-        return project
+    is_owner = project.owner_id == user_id
 
-    membership = (
+    is_member = (
         db.query(ProjectMember)
         .filter(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user_id,
         )
         .first()
+        is not None
     )
 
-    if not membership:
+    if not is_owner and not is_member:
         raise ProjectNotFoundException()
 
-    return project
+    return project_to_response_data(db, project)
+
 
 def update_project(
     db: Session,
     project_id: int,
     user_id: int,
     project_data: ProjectUpdate,
-):
-    project = get_project(
-        db=db,
-        project_id=project_id,
-        user_id=user_id,
-    )
-
-    project.name = project_data.name
-    project.description = project_data.description
-
-    db.commit()
-    db.refresh(project)
-
-    return project
-
-
-def delete_project(
-    db: Session,
-    project_id: int,
-    user_id: int,
 ):
     project = (
         db.query(Project)
@@ -118,38 +131,29 @@ def delete_project(
     if not project:
         raise ProjectNotFoundException()
 
-    if project.owner_id != user_id:
-        raise ProjectOwnerRequiredException()
+    is_owner = project.owner_id == user_id
 
-    # Get document paths before deleting DB records
-    documents = (
-        db.query(Document)
-        .filter(Document.project_id == project_id)
-        .all()
+    is_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
+        )
+        .first()
+        is not None
     )
 
-    storage_keys = [document.storage_key for document in documents]
+    if not is_owner and not is_member:
+        raise ProjectNotFoundException()
 
-    # Delete child records first
-    db.query(Document).filter(
-        Document.project_id == project_id
-    ).delete(synchronize_session=False)
-
-    db.query(ProjectMember).filter(
-        ProjectMember.project_id == project_id
-    ).delete(synchronize_session=False)
-
-    # Force those DELETEs to PostgreSQL now
-    db.flush()
-
-    # Now no child rows reference the project
-    db.delete(project)
+    project.name = project_data.name
+    project.description = project_data.description
 
     db.commit()
+    db.refresh(project)
 
-    # Finally remove physical files
-    for storage_key in storage_keys:
-        storage_service.delete_file(storage_key)
+    return project_to_response_data(db, project)
+
 
 def invite_user(
     db: Session,
@@ -188,7 +192,7 @@ def invite_user(
     )
 
     if existing_member:
-        raise UserAlreadyMemberException()
+        return existing_member
 
     member = ProjectMember(
         project_id=project_id,
@@ -201,3 +205,135 @@ def invite_user(
     db.refresh(member)
 
     return member
+
+
+def get_project_members(
+    db: Session,
+    project_id: int,
+    user_id: int,
+):
+    project_data = get_project(
+        db=db,
+        project_id=project_id,
+        user_id=user_id,
+    )
+
+    owner = (
+        db.query(User)
+        .filter(User.id == project_data["owner_id"])
+        .first()
+    )
+
+    members = (
+        db.query(
+            ProjectMember.user_id,
+            User.email,
+            ProjectMember.role,
+        )
+        .join(
+            User,
+            User.id == ProjectMember.user_id,
+        )
+        .filter(ProjectMember.project_id == project_id)
+        .all()
+    )
+
+    result = [
+        {
+            "user_id": owner.id,
+            "email": owner.email,
+            "role": "owner",
+        }
+    ]
+
+    result.extend(
+        {
+            "user_id": member.user_id,
+            "email": member.email,
+            "role": member.role,
+        }
+        for member in members
+    )
+
+    return result
+def remove_project_member(
+    db: Session,
+    project_id: int,
+    member_user_id: int,
+    owner_id: int,
+):
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .first()
+    )
+
+    if not project:
+        raise ProjectNotFoundException()
+
+    if project.owner_id != owner_id:
+        raise ProjectOwnerRequiredException()
+
+    member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == member_user_id,
+        )
+        .first()
+    )
+
+    if not member:
+        raise ProjectMemberNotFoundException()
+
+    db.delete(member)
+    db.commit()
+
+
+def delete_project(
+    db: Session,
+    project_id: int,
+    user_id: int,
+):
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .first()
+    )
+
+    if not project:
+        raise ProjectNotFoundException()
+
+    if project.owner_id != user_id:
+        raise ProjectOwnerRequiredException()
+
+    # Save document paths before deleting their DB records.
+    documents = (
+        db.query(Document)
+        .filter(Document.project_id == project_id)
+        .all()
+    )
+
+    storage_keys = [
+        document.storage_key
+        for document in documents
+    ]
+
+    # Delete child records first because they reference projects
+    # through foreign keys.
+    db.query(Document).filter(
+        Document.project_id == project_id
+    ).delete(synchronize_session=False)
+
+    db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id
+    ).delete(synchronize_session=False)
+
+    db.flush()
+
+    db.delete(project)
+    db.commit()
+
+    # Delete physical files after the database transaction succeeds.
+    for storage_key in storage_keys:
+        storage_service.delete_file(storage_key)
