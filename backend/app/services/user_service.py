@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from backend.app.schemas.user import UserRegister
-from backend.app.core.security import hash_password, verify_password
+from backend.app.core.security import hash_password, verify_password,  create_access_token
 from backend.app.models.user import User
 from backend.app.core.exceptions import UserAlreadyExistsException
 from backend.app.core.exceptions import PasswordsDoNotMatchException
@@ -15,13 +15,18 @@ def login_user(db: Session, credentials: UserLogin):
     )
 
     if not user or not verify_password(
-            credentials.password,
-            user.hashed_password
+        credentials.password,
+        user.hashed_password,
     ):
         raise InvalidCredentialsException()
 
-    return user
+    access_token = create_access_token(user.id)
 
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user,
+    }
 def register_user(db: Session, user: UserRegister):
     if user.password != user.repeat_password:
         raise PasswordsDoNotMatchException()

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from backend.app.models.document import Document
 from backend.app.services import storage_service
 from backend.app.services import project_service
-
+from backend.app.core.exceptions import ProjectNotFoundException
 
 def upload_document(
     db: Session,
@@ -57,7 +57,7 @@ def get_project_documents(
         .all()
     )
 
-from backend.app.core.exceptions import ProjectNotFoundException
+
 
 
 def get_document(

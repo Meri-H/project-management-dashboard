@@ -19,3 +19,8 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     login: str
     password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
