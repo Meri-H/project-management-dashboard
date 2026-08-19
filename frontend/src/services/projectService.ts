@@ -1,4 +1,4 @@
-import { apiJson, getCurrentUserId } from './api'
+import { apiJson } from './api'
 import type {
   ProjectCreate,
   ProjectMember,
@@ -8,9 +8,7 @@ import type {
 } from '../types/project'
 
 export async function getProjects(): Promise<ProjectResponse[]> {
-  return apiJson<ProjectResponse[]>('/projects/', {
-    query: { user_id: getCurrentUserId() },
-  })
+  return apiJson<ProjectResponse[]>('/projects/')
 }
 
 export async function createProject(
@@ -18,62 +16,76 @@ export async function createProject(
 ): Promise<ProjectResponse> {
   return apiJson<ProjectResponse>('/projects/', {
     method: 'POST',
-    query: { owner_id: getCurrentUserId() },
     body: payload,
   })
 }
 
-export async function getProject(projectId: number): Promise<ProjectResponse> {
-  return apiJson<ProjectResponse>(`/projects/${projectId}/info`, {
-    query: { user_id: getCurrentUserId() },
-  })
+export async function getProject(
+  projectId: number,
+): Promise<ProjectResponse> {
+  return apiJson<ProjectResponse>(
+    `/projects/${projectId}/info`,
+  )
 }
 
 export async function updateProject(
   projectId: number,
   payload: ProjectUpdate,
 ): Promise<ProjectResponse> {
-  return apiJson<ProjectResponse>(`/projects/${projectId}/info`, {
-    method: 'PUT',
-    query: { user_id: getCurrentUserId() },
-    body: payload,
-  })
+  return apiJson<ProjectResponse>(
+    `/projects/${projectId}/info`,
+    {
+      method: 'PUT',
+      body: payload,
+    },
+  )
 }
 
-export async function deleteProject(projectId: number): Promise<void> {
-  return apiJson<void>(`/projects/${projectId}`, {
-    method: 'DELETE',
-    query: { user_id: getCurrentUserId() },
-  })
+export async function deleteProject(
+  projectId: number,
+): Promise<void> {
+  return apiJson<void>(
+    `/projects/${projectId}`,
+    {
+      method: 'DELETE',
+    },
+  )
 }
 
 export async function inviteUser(
   projectId: number,
   userLogin: string,
 ): Promise<ProjectMember> {
-  return apiJson<ProjectMember>(`/projects/${projectId}/invite`, {
-    method: 'POST',
-    query: {
-      owner_id: getCurrentUserId(),
-      user: userLogin,
+  return apiJson<ProjectMember>(
+    `/projects/${projectId}/invite`,
+    {
+      method: 'POST',
+
+      // This is NOT authentication data.
+      // It identifies which user should be invited.
+      query: {
+        user: userLogin,
+      },
     },
-  })
+  )
 }
 
 export async function getProjectMembers(
   projectId: number,
 ): Promise<ProjectMemberInfo[]> {
-  return apiJson<ProjectMemberInfo[]>(`/projects/${projectId}/members`, {
-    query: { user_id: getCurrentUserId() },
-  })
+  return apiJson<ProjectMemberInfo[]>(
+    `/projects/${projectId}/members`,
+  )
 }
 
 export async function removeProjectMember(
   projectId: number,
   memberUserId: number,
 ): Promise<void> {
-  return apiJson<void>(`/projects/${projectId}/members/${memberUserId}`, {
-    method: 'DELETE',
-    query: { owner_id: getCurrentUserId() },
-  })
+  return apiJson<void>(
+    `/projects/${projectId}/members/${memberUserId}`,
+    {
+      method: 'DELETE',
+    },
+  )
 }

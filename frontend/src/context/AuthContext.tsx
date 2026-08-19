@@ -8,7 +8,10 @@ import {
 } from 'react'
 import * as authService from '../services/authService'
 import type { UserLogin, UserRegister, UserResponse } from '../types/user'
-import { AUTH_STORAGE_KEY } from '../utils/authStorage'
+import {
+  AUTH_STORAGE_KEY,
+  TOKEN_STORAGE_KEY,
+} from '../utils/authStorage'
 
 type AuthContextValue = {
   user: UserResponse | null
@@ -22,6 +25,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 function readStoredUser(): UserResponse | null {
   const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+
   if (!raw) {
     return null
   }
@@ -39,8 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const persistUser = useCallback((next: UserResponse | null) => {
     setUser(next)
+
     if (next) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next))
+      localStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify(next),
+      )
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY)
     }
@@ -48,9 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (credentials: UserLogin) => {
-      const loggedIn = await authService.login(credentials)
-      persistUser(loggedIn)
-      return loggedIn
+      const response = await authService.login(credentials)
+
+      localStorage.setItem(
+        TOKEN_STORAGE_KEY,
+        response.access_token,
+      )
+
+      persistUser(response.user)
+
+      return response.user
     },
     [persistUser],
   )
@@ -60,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
     persistUser(null)
   }, [persistUser])
 
@@ -74,13 +90,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, login, register, logout],
   )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext)
+
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider')
   }
+
   return context
 }

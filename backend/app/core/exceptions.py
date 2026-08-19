@@ -62,3 +62,10 @@ class ProjectMemberNotFoundException(AppException):
             message="Project participant not found",
             status_code=404,
         )
+
+class InvalidTokenException(AppException):
+    def __init__(self):
+        super().__init__(
+            message="Invalid or expired access token",
+            status_code=401,
+        )

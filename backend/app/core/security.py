@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-
+from backend.app.core.exceptions import InvalidTokenException
 from backend.app.db.dependencies import get_db
 from backend.app.models.user import User
 from backend.app.core.exceptions import InvalidCredentialsException
@@ -60,9 +60,12 @@ def create_access_token(user_id: int) -> str:
     )
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
     db: Session = Depends(get_db),
 ):
+    if credentials is None:
+        raise InvalidTokenException()
+
     token = credentials.credentials
 
     try:
@@ -75,10 +78,10 @@ def get_current_user(
         user_id = payload.get("sub")
 
         if user_id is None:
-            raise InvalidCredentialsException()
+            raise InvalidTokenException()
 
     except JWTError:
-        raise InvalidCredentialsException()
+        raise InvalidTokenException()
 
     user = (
         db.query(User)
@@ -87,6 +90,6 @@ def get_current_user(
     )
 
     if not user:
-        raise InvalidCredentialsException()
+        raise InvalidTokenException()
 
     return user

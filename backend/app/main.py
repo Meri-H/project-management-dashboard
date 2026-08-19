@@ -9,6 +9,11 @@ from backend.app.core.exception_handlers import register_exception_handlers
 from backend.app.api.auth import router as auth_router
 from backend.app.api.projects import router as projects_router
 from backend.app.api.documents import router as documents_router
+from backend.app.services import lambda_service
+from fastapi import Depends
+from backend.app.core.security import get_current_user
+from backend.app.models.user import User
+
 
 app = FastAPI(title="Project Management Dashboard API")
 
@@ -47,3 +52,12 @@ def database_session_health(
     db.execute(text("SELECT 1"))
 
     return {"database_session": "working"}
+
+
+@app.get("/lambda/test")
+def test_lambda(
+    current_user: User = Depends(get_current_user),
+):
+    return lambda_service.process_project(
+        "Project Management Dashboard"
+    )
